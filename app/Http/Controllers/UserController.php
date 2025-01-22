@@ -41,11 +41,16 @@ class UserController extends Controller
 
             // Appel au service de logging
             LogService::info('Nouvel utilisateur créé', [
-                'user_id' => $user->id,
-                'name' => $user->name,
-                'email' => $user->email,
-                'ip_address' => $request->ip(),
                 'action' => 'create_user',
+                'status' => 'success',
+                'user_id' => optional(auth()->user())->id,
+                'ip_address' => $request->ip(),
+                'url' => $request->fullUrl(),
+                'method' => $request->method(),
+                'details' => [
+                    'created_user_id' => $user->id,
+                    'created_user_name' => $user->name,
+                ],
             ]);
 
             DB::commit();
@@ -58,9 +63,13 @@ class UserController extends Controller
             DB::rollBack();
 
             LogService::error('Erreur lors de la création d\'un utilisateur', [
-                'error_message' => $e->getMessage(),
-                'ip_address' => $request->ip(),
                 'action' => 'create_user',
+                'status' => 'error',
+                'user_id' => optional(auth()->user())->id,
+                'ip_address' => $request->ip(),
+                'url' => $request->fullUrl(),
+                'method' => $request->method(),
+                'error_message' => $e->getMessage(),
             ]);
 
             return response()->json([
@@ -72,7 +81,7 @@ class UserController extends Controller
     /**
      * Liste tous les utilisateurs.
      */
-    public function listUsers()
+    public function listUsers(Request $request)
     {
         // Récupérer tous les utilisateurs
         $users = $this->userRepository->getAll();
@@ -80,9 +89,12 @@ class UserController extends Controller
 
         // Log l'événement avec plus de contexte
         LogService::info('Liste des utilisateurs récupérée', [
-            'count' => $users->count(),
-            'ip_address' => request()->ip(),
             'action' => 'list_users',
+            'status' => 'success',
+            'user_id' => optional(auth()->user())->id,
+            'ip_address' => $request->ip(),
+            'url' => $request->fullUrl(),
+            'method' => $request->method(),
         ]);
 
         return response()->json([
@@ -94,7 +106,7 @@ class UserController extends Controller
     /**
      * Supprime un utilisateur par ID.
      */
-    public function deleteUser($id)
+    public function deleteUser($id, Request $request)
     {
         $user = $this->userRepository->findById($id);
 
@@ -105,11 +117,17 @@ class UserController extends Controller
                 $user->delete();
 
                 // Log de la suppression avec plus de contexte
-                LogService::info('Utilisateur supprimé', [
-                    'deleted_user_id' => $user->id,
-                    'deleted_user_name' => $user->name,
-                    'ip_address' => request()->ip(),
+                LogService::info('Utilisateur supprimé avec succès', [
                     'action' => 'delete_user',
+                    'status' => 'success',
+                    'user_id' => optional(auth()->user())->id,
+                    'ip_address' => $request->ip(),
+                    'url' => $request->fullUrl(),
+                    'method' => $request->method(),
+                    'details' => [
+                        'deleted_user_id' => $user->id,
+                        'deleted_user_name' => $user->name,
+                    ],
                 ]);
 
                 DB::commit(); // Valide la transaction
@@ -120,9 +138,13 @@ class UserController extends Controller
             } catch (\Exception $e) {
                 DB::rollBack(); // Annule la transaction en cas d'erreur
                 LogService::error('Erreur lors de la suppression de l\'utilisateur', [
-                    'error_message' => $e->getMessage(),
-                    'ip_address' => request()->ip(),
                     'action' => 'delete_user',
+                    'status' => 'error',
+                    'user_id' => optional(auth()->user())->id,
+                    'ip_address' => $request->ip(),
+                    'url' => $request->fullUrl(),
+                    'method' => $request->method(),
+                    'error_message' => $e->getMessage(),
                 ]);
 
                 return response()->json([
@@ -132,10 +154,16 @@ class UserController extends Controller
         } else {
             // Log si l'utilisateur est introuvable
             LogService::warning('Tentative de suppression d\'un utilisateur introuvable', [
-                'user_id' => $id,
-                'ip_address' => request()->ip(),
                 'action' => 'delete_user',
-                'status' => 'not_found',
+                'status' => 'error',
+                'user_id' => optional(auth()->user())->id,
+                'ip_address' => $request->ip(),
+                'url' => $request->fullUrl(),
+                'method' => $request->method(),
+                'details' => [
+                    'deleted_user_id' => $id,
+                    'error_message' => 'Utilisateur introuvable',
+                ],
             ]);
 
             return response()->json([
