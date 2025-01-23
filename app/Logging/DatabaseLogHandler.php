@@ -22,7 +22,7 @@ class DatabaseLogHandler extends AbstractProcessingHandler
 
             // Récupérer l'adresse IP du contexte
             $ipAddress = $context['ip_address'] ?? null;
-            $macAddress = null;
+            $macAddress = 'unavailable';
 
             // Si une adresse IP est disponible, tenter de récupérer l'adresse MAC
             if ($ipAddress) {
