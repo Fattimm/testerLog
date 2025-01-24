@@ -40,7 +40,7 @@ class UserController extends Controller
             ]);
 
             // Appel au service de logging
-            LogService::info('Nouvel utilisateur créé', [
+            LogService::info('Nouvel uuserstilisateur créé', [
                 'action' => 'create_user',
                 'status' => 'success',
                 'user_id' => optional(auth()->user())->id,
