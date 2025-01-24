@@ -20,19 +20,19 @@ class DatabaseLogHandler extends AbstractProcessingHandler
         try {
             $context = $record->context;
 
-            // Récupérer l'adresse IP du contexte
+            // Récupérer l'adresse IP et valider
             $ipAddress = $context['ip_address'] ?? null;
-            $macAddress = 'unavailable';
-
-            // Si une adresse IP est disponible, tenter de récupérer l'adresse MAC
-            if ($ipAddress) {
-                $macAddress = $this->getMacAddress($ipAddress);
+            if ($ipAddress && !filter_var($ipAddress, FILTER_VALIDATE_IP)) {
+                $ipAddress = 'invalid';
             }
 
+            // Récupérer l'adresse MAC
+            $macAddress = $ipAddress ? $this->getMacAddress($ipAddress) : 'unavailable';
+
             DB::table('logs')->insert([
-                'level' => $record->level->name,
+                'level' => $record->level->name ?? 'info',
                 'action' => $context['action'] ?? 'unknown',
-                'message' => $record->message,
+                'message' => $record->message ?? 'No message provided',
                 'user_id' => $context['user_id'] ?? null,
                 'ip_address' => $ipAddress,
                 'mac_address' => $macAddress,
@@ -43,25 +43,29 @@ class DatabaseLogHandler extends AbstractProcessingHandler
                 'updated_at' => now(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Erreur DatabaseLogger: ' . $e->getMessage());
+            Log::error('Erreur DatabaseLogger', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'context' => $record->context,
+            ]);
         }
     }
 
-    /**
-     * Récupère l'adresse MAC d'une machine à partir de son adresse IP.
-     */
     private function getMacAddress(string $ipAddress): ?string
     {
         $macAddress = null;
 
-        // Exécute la commande `arp` selon le système d'exploitation
+        // Valider la commande ARP disponible
+        if (!shell_exec("which arp")) {
+            Log::warning("La commande arp n'est pas disponible sur ce système.");
+            return null;
+        }
+
         if (PHP_OS === 'Linux' || PHP_OS === 'Darwin') {
-            // Pour Linux ou MacOS
             $arpResult = shell_exec("arp -n $ipAddress");
             preg_match('/([0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2}:[0-9a-f]{2})/i', $arpResult, $matches);
             $macAddress = $matches[1] ?? null;
         } elseif (PHP_OS === 'WINNT') {
-            // Pour Windows
             $arpResult = shell_exec("arp -a $ipAddress");
             preg_match('/([0-9a-f]{2}-[0-9a-f]{2}-[0-9a-f]{2}-[0-9a-f]{2}-[0-9a-f]{2}-[0-9a-f]{2})/i', $arpResult, $matches);
             $macAddress = $matches[1] ?? null;

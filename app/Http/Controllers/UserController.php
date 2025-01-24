@@ -95,6 +95,9 @@ class UserController extends Controller
             'ip_address' => $request->ip(),
             'url' => $request->fullUrl(),
             'method' => $request->method(),
+            'details' => [
+                'total_users' => $users->count(),
+            ],
         ]);
 
         return response()->json([
