@@ -21,27 +21,30 @@ class DatabaseLogHandler extends AbstractProcessingHandler
             $context = $record->context;
 
             // Récupérer l'adresse IP et valider
-            $ipAddress = $context['ip_address'] ?? null;
-            if ($ipAddress && !filter_var($ipAddress, FILTER_VALIDATE_IP)) {
+            // $ipAddress = $context['ip_address'] ?? null;
+            $ipAddress = filter_var($context['ip_address'] ?? null, FILTER_VALIDATE_IP) ? $context['ip_address'] : 'unknown';
+
+            if (!$ipAddress || !filter_var($ipAddress, FILTER_VALIDATE_IP)) {
                 $ipAddress = 'invalid';
             }
+            
 
             // Récupérer l'adresse MAC
             $macAddress = $ipAddress ? $this->getMacAddress($ipAddress) : 'unavailable';
 
             DB::table('logs')->insert([
-                'level' => $record->level->name ?? 'info',
-                'action' => $context['action'] ?? 'unknown',
-                'message' => $record->message ?? 'No message provided',
-                'user_id' => $context['user_id'] ?? null,
-                'ip_address' => $ipAddress,
-                'mac_address' => $macAddress,
-                'status' => $context['status'] ?? 'unknown',
-                'details' => json_encode($context['details'] ?? [], JSON_UNESCAPED_UNICODE),
-                'context' => json_encode($record->context, JSON_UNESCAPED_UNICODE),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+            'level' => $record->level->name,
+            'action' => $context['action'] ?? 'Action inconnue',
+            'message' => $context['message'] ?? $record->message,
+            'user_id' => $context['user_id'] ?? null,
+            'ip_address' => $ipAddress,
+            'mac_address' => $macAddress,
+            'status' => $context['status'] ?? 'unknown',
+            'details' => json_encode($context['details'] ?? [], JSON_UNESCAPED_UNICODE),
+            'context' => json_encode($context, JSON_UNESCAPED_UNICODE),
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
         } catch (\Exception $e) {
             Log::error('Erreur DatabaseLogger', [
                 'error' => $e->getMessage(),

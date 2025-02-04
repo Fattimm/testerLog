@@ -14,7 +14,7 @@ class LogService
      */
     public static function info(string $message, array $context = [])
     {
-        Log::channel('database')->info($message, $context);
+        Log::channel('stack')->info($message, $context);
     }
 
     /**
@@ -25,7 +25,7 @@ class LogService
      */
     public static function error(string $message, array $context = [])
     {
-        Log::channel('database')->error($message, $context);
+        Log::channel('stack')->error($message, $context);
     }
 
     /**
@@ -36,6 +36,6 @@ class LogService
      */
     public static function warning(string $message, array $context = [])
     {
-        Log::channel('database')->warning($message, $context);
+        Log::channel('stack')->warning($message, $context);
     }
 }

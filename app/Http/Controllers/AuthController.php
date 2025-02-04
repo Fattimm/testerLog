@@ -2,138 +2,87 @@
 
 namespace App\Http\Controllers;
 
+use App\Traits\LogsActions;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Services\LogService;
+use Illuminate\Support\Facades\Validator;
 
-class AuthController extends Controller
+class AuthController extends Controller 
 {
-    /**
-     * Connexion d'un utilisateur
-     */
+    use LogsActions;
 
     public function login(Request $request)
     {
-        
-        try {
-            $credentials = $request->validate([
-                'email' => 'required|email',
-                'password' => 'required',
-            ]);
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email',
+            'password' => 'required',
+        ]);
 
-            // Tenter de connecter l'utilisateur
-            if (!Auth::attempt($credentials)) {
-                // Log d'échec de connexion
-                LogService::warning('Échec de connexion', [
-                    'action' => 'login',
-                    'status' => 'error',
-                    'email' => $request->email,
-                    'ip_address' => $request->ip(),
-                    // 'mac_address' => $macAddress,
-                    'url' => $request->fullUrl(),
-                    'method' => $request->method(),
-                    'details' => [
-                        'email' => $request->email,
-                    ],
-                ]);
-
-                return response()->json([
-                    'message' => 'Erreur d\'authentification : Email ou mot de passe incorrect',
-                ], 401);
-            }
-
-            // Récupérer l'utilisateur connecté
-            $user = Auth::user();
-
-            // Générer un token d'accès
-            $token = $user->createToken('Personal Access Token')->accessToken;
-
-            // Log de succès de connexion
-            LogService::info('Connexion réussie', [
-                'action' => 'login',
-                'status' => 'success',
-                'user_id' => $user->id,
-                'email' => $user->email,
-                'ip_address' => $request->ip(),
-                // 'mac_address' => $macAddress,
-                'url' => $request->fullUrl(),
-                'method' => $request->method(),
-                'details' => [
-                    'email' => $request->email,
-                ],
+        if ($validator->fails()) {
+            $this->addLogDetails([
+                'validation_errors' => $validator->errors()->toArray(),
+                'submitted_data' => $request->except('password')
             ]);
 
             return response()->json([
-                'message' => 'Connexion réussie',
-                'token' => $token,
-                'user' => $user,
-            ]);
-        } catch (\Exception $e) {
-            // Log d'erreur
-            LogService::error('Erreur lors de la tentative de connexion', [
-                'action' => 'login',
-                'status' => 'error',
-                'email' => $request->email ?? 'inconnu',
-                'ip_address' => $request->ip(),
-                'error_message' => $e->getMessage(),
-                // 'mac_address' => $macAddress,
-                'url' => $request->fullUrl(),
-                'method' => $request->method(),
-                'details' => [
-                    'email' => $request->email,
-                ],
-            ]);
-
-            return response()->json([
-                'message' => 'Une erreur est survenue lors de la connexion',
-            ], 500);
+                'message' => 'Erreur de validation',
+                'errors' => $validator->errors()
+            ], 422);
         }
+
+        $validated = $validator->validated();
+
+        if (!Auth::attempt($validated)) {
+            $this->addLogDetails([
+                'email' => $validated['email'],
+                'error' => 'Identifiants invalides',
+                'submitted_data' => ['email' => $validated['email']]
+            ]);
+
+            return response()->json([
+                'message' => 'Erreur d\'authentification : Email ou mot de passe incorrect',
+            ], 401);
+        }
+
+        $user = Auth::user();
+        $token = $user->createToken('Personal Access Token')->accessToken;
+
+        $this->addLogDetails([
+            'user_id' => $user->id,
+            'email' => $user->email
+        ]);
+
+        return response()->json([
+            'message' => 'Connexion réussie',
+            'token' => $token,
+            'user' => $user,
+        ]);
     }
 
     public function logout(Request $request)
     {
         try {
-            // Révoquer le token actif
-            $token = $request->user()->token();
-            $token->revoke();
-
-            // Log de succès de déconnexion
-            LogService::info('Déconnexion réussie', [
-                'action' => 'logout',
-                'status' => 'success',
-                'user_id' => $request->user()->id,
-                'email' => $request->user()->email,
-                'ip_address' => $request->ip(),
-                // 'mac_address' => $macAddress,
-                'url' => $request->fullUrl(),
-                'method' => $request->method(),
-                'details' => [
-                    'email' => $request->email,
-                ],
+            $user = $request->user();
+            
+            $this->addLogDetails([
+                'user_id' => $user->id,
+                'email' => $user->email
             ]);
+
+            // $request->user()->token()->revoke();
+            $request->user()->currentAccessToken()->delete();
 
             return response()->json([
                 'message' => 'Déconnexion réussie',
             ]);
         } catch (\Exception $e) {
-            // Log d'erreur
-            LogService::error('Erreur lors de la tentative de déconnexion', [
-                'action' => 'logout',
-                'status' => 'error',
-                'user_id' => $request->user()->id ?? 'inconnu',
-                'email' => $request->user()->email ?? 'inconnu',
-                'ip_address' => $request->ip(),
+            $this->addLogDetails([
                 'error_message' => $e->getMessage(),
-                // 'mac_address' => $macAddress,
-                'url' => $request->fullUrl(),
-                'method' => $request->method(),
-                'details' => [
-                    'email' => $request->email,
-                ],
+                'user_id' => $request->user()?->id
             ]);
 
             return response()->json([
-                'message' => 'Une erreur est survenue lors de la déconnexion',
+                'message' => 'Erreur lors de la déconnexion',
             ], 500);
         }
     }
